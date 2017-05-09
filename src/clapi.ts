@@ -1,4 +1,8 @@
 /** structural typedefs */
+declare interface process {
+    cwd(): string;
+}
+declare const process: process;
 declare interface EventEmitter {
     on(event: string, fn: Function): void;
 }
@@ -11,6 +15,7 @@ declare interface ChildProcess extends EventEmitter {
     stdout: EventEmitter;
     stderr: EventEmitter;
     disconnect: Function;
+    connected: boolean;
 }
 declare interface child_process {
     ChildProcess: ChildProcess;
@@ -26,7 +31,7 @@ declare interface ProxyHandler {
     get (target: object, name: string): any;
     set (object: object, property: string, value: any): any;
 }
-declare interface Proxy extends CommandLineInterfaceWrapper {
+declare interface Proxy extends clapi {
     new (object: object, handler: ProxyHandler): any;
 }
 declare const Proxy: Proxy;
@@ -41,7 +46,7 @@ const child_process: child_process = require('child_process');
  *
  * @module
  *
- * The CLIWrapper or "CLIW" class wraps any command line executable in a NodeJS class.
+ * The clapi class wraps any command line executable in a NodeJS class.
  *
  * @example
  *
@@ -61,7 +66,7 @@ const child_process: child_process = require('child_process');
  * du['-sh']('./src/*').then(...);
  *
  */
-export default class CommandLineInterfaceWrapper {
+export default class clapi {
 
     /**
      * The main command to be represented by this instance e.g.
@@ -95,25 +100,26 @@ export default class CommandLineInterfaceWrapper {
     public process: ChildProcess = null;
 
     /**
+     * Try to spawn instead of exec from child_process.
+     */
+    public spawn: boolean = false;
+
+    /**
      * @note Copy-construction enabled.
      * @param command can be any CLI command.
+     * @param [spawn] try to spawn child processes instead of using exec.
      * @param [prefix] to be prepended to the ioBuffer log.
      * @returns {Proxy}
      */
-    public constructor(command: string|CommandLineInterfaceWrapper, prefix: string = '') {
+    public constructor(command: string|clapi,
+                       spawn: boolean = false,
+                       prefix: string = '') {
 
-        if (command instanceof CommandLineInterfaceWrapper) {
+        if (command instanceof clapi) {
             return this.copyConstructor(command);
         }
 
-        if (!prefix && !command) {
-            prefix = 'SHELL: ';
-        }
-
-        if (!prefix) {
-            prefix = command + ': ';
-        }
-
+        this.spawn = spawn;
         this.command = command;
         this.prefix = prefix;
         const ioBuffer: string[] = this.ioBuffer = (this.ioBuffer || []);
@@ -122,7 +128,7 @@ export default class CommandLineInterfaceWrapper {
             return this.dispatchCommand(ioBuffer, command, ...argv);
         }.bind(this);
 
-        Object.setPrototypeOf(callable, CommandLineInterfaceWrapper.prototype);
+        Object.setPrototypeOf(callable, clapi.prototype);
 
         this.proxy = new Proxy(callable, this.handler());
         return this.proxy;
@@ -130,7 +136,7 @@ export default class CommandLineInterfaceWrapper {
     }
 
     /**
-     * Invoking any method on a CommandLineInterfaceWrapper instance will result in
+     * Invoking any method on a clapi instance will result in
      * the base command being dispatched with the method name as its first argument.
      *
      * Any number of arguments to the method will be appended as additional CLI arguments.
@@ -164,7 +170,7 @@ export default class CommandLineInterfaceWrapper {
                        resolve: Function,
                        reject: Function): IoCallback {
 
-        return <IoCallback>function (error: string, stdout: string, stderr: string) {
+        return <IoCallback>(error: string, stdout: string, stderr: string): void => {
 
             if (error) {
                 this.addTo(ioBuffer, error);
@@ -190,32 +196,40 @@ export default class CommandLineInterfaceWrapper {
     private dispatchCommand(ioBuffer: string[] = this.ioBuffer,
                             ...argv: string[]): Promise<string[]> {
 
+        const { spawn } = this;
+
         return new Promise((resolve, reject) => {
 
             const hasResolved: boolean = false;
 
-            if (!this.process) {
+            if (spawn) {
+                if (!this.process) {
 
-                const proc = this.process = child_process.spawn(argv[0], argv.slice(1));
+                    const proc = this.process = child_process.spawn(argv[0], argv.slice(1), {
+                        cwd: process.cwd()
+                    });
 
-                proc.stdout.on('data', (data: string): void => {
-                    this.addTo(ioBuffer, data);
-                    !hasResolved && resolve(ioBuffer);
-                });
-                proc.stderr.on('data', (data: string): void => {
-                    this.addTo(ioBuffer, data);
-                    !hasResolved && reject(ioBuffer);
-                });
-                proc.on('close', (code: number): void => {
-                    this.addTo(ioBuffer, `Child process exited with code ${code}.`);
-                    this.process = null;
-                    !hasResolved && resolve(ioBuffer);
-                });
+                    proc.stdout.on('data', (data: string): void => {
+                        this.addTo(ioBuffer, data);
+                        !hasResolved && resolve(ioBuffer);
+                    });
+                    proc.stderr.on('data', (data: string): void => {
+                        this.addTo(ioBuffer, data);
+                        !hasResolved && reject(ioBuffer);
+                    });
+                    proc.on('close', (code: number): void => {
+                        this.addTo(ioBuffer, `Child process exited with code ${code}.`);
+                        this.process = null;
+                        !hasResolved && resolve(ioBuffer);
+                    });
 
+                } else {
+
+                    this.process.stdin.write(argv.join(' '), 'utf-8', this.ioCallback(ioBuffer, resolve, reject));
+
+                }
             } else {
-
-                this.process.stdin.write(argv.join(' '), 'utf-8', this.ioCallback(ioBuffer, resolve, reject));
-
+                this.process = child_process.exec(argv.join(' '), this.ioCallback(ioBuffer, resolve, reject));
             }
 
         });
@@ -244,12 +258,12 @@ export default class CommandLineInterfaceWrapper {
     private format(raw: string|string[]): string[] {
         const { prefix = '' } = this;
 
-        if (typeof raw === 'string') {
+        if (raw instanceof Array) {
+            raw = raw.map(_ => _.toString());
+        } else {
             raw = (raw || '')
                 .toString()
                 .split('\n');
-        } else {
-            raw = [...raw];
         }
 
         return raw
@@ -283,10 +297,11 @@ export default class CommandLineInterfaceWrapper {
 
     /**
      * @param other
-     * @returns {CommandLineInterfaceWrapper} a copy of the other CLIW.
+     * @returns {clapi} a copy of the other CLIW.
      */
-    public copyConstructor(other: CommandLineInterfaceWrapper): CommandLineInterfaceWrapper {
+    public copyConstructor(other: clapi): clapi {
 
+        this.spawn = other.spawn;
         this.command = other.command;
         this.prefix = other.prefix;
         this.ioBuffer = other.ioBuffer.slice();
@@ -299,9 +314,12 @@ export default class CommandLineInterfaceWrapper {
     /**
      * Move another instance into this one.
      * @param other
-     * @returns {CommandLineInterfaceWrapper}
+     * @returns {clapi}
      */
-    public moveConstructor(other: CommandLineInterfaceWrapper): CommandLineInterfaceWrapper {
+    public moveConstructor(other: clapi): clapi {
+
+        this.spawn = other.spawn;
+        delete other.spawn;
 
         this.command = other.command;
         delete other.command;
@@ -326,10 +344,10 @@ export default class CommandLineInterfaceWrapper {
      * Deletes all properties of this instance.
      */
     public destructor(): void {
-        if (this.process) {
+        if (this.process && this.process.connected) {
             this.process.disconnect();
         }
-        new CommandLineInterfaceWrapper('').moveConstructor(this);
+        new clapi('').moveConstructor(this);
     }
 
 };

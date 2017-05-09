@@ -1,9 +1,9 @@
 {
-  "name": "cli-to-node",
+  "name": "bam-node-clapi",
   "version": "0.1.0",
   "description": "call any cli program from a JS class object",
   "main": "index.js",
-  "author": "",
+  "author": "george.fu@mlb.com",
   "license": "ISC",
   "scripts": {
     "test": "tsc; node test/main.js;"

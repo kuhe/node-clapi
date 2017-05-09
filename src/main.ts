@@ -1,4 +1,4 @@
-import CommandLineInterfaceWrapper from './CommandLineInterfaceWrapper';
+import clapi from './clapi';
 
-export { CommandLineInterfaceWrapper };
-export default CommandLineInterfaceWrapper;
+export { clapi };
+export default clapi;
