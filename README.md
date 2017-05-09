@@ -22,32 +22,33 @@ As such, the following are equivalent:
 const eslint = new clapi('eslint');
 
 // 1.
-eslint('lib src controllers');
+eslint('lib src controllers'); // -> Promise<stdout>
 
 // 2.
-eslint('lib', 'src', 'controllers');
+eslint('lib', 'src', 'controllers'); // -> Promise<stdout>
 
 // 3.
-eslint.lib('src', 'controllers'); // any method call is treated equivalently as the first argument
-
-// Yes, the proxy traps the method call to an otherwise undefined property `lib` on our `clapi` instance.
-
-eslint.src().then(output => {
-
-    console.log(...output);
-
-});
-
+eslint.lib('src', 'controllers'); // -> Promise<stdout>
+                                  // any method call is treated equivalently as the first argument (!)
 
 ```
 
-##### Well... what can you even do with it?
+The `Proxy` implementation intercepts the property access to `lib` which is undefined, and instead
+ returns a `Function<Promise<stdout>>` method that will forward its arguments to the command line via
+ `child_process.exec`.
+
+In `shelljs` this would be something like `shelljs.exec(`eslint lib src controllers`).stdout;`.
+
+###### @todo: how do you maintain an open process with child_process.spawn?
+
+
+### Well... what can you even do with it?
 
 I don't know! You can pretend to have node APIs for command line programs.
 
 ```js
 
-// Commit something!
+// Commit something?
 const git = new clapi('git');
 git.commit('-am work in progress').then(() => {
 
@@ -55,7 +56,7 @@ git.commit('-am work in progress').then(() => {
 
 });
 
-// Compile and execute hello.cpp!
+// Compile and execute hello.cpp?
 
 const gpp = new clapi('g++');
 
