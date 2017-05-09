@@ -121,8 +121,7 @@ const greeting = 'Hello, world!';
     logToConsole,
     stdout => {
 
-        assert.equal(stdout.join('\n'), `cli-to-node@0.1.0 /Users/fu/www/github/cli-to-node
-└── typescript@2.3.2 `, 'npm ls check');
+        assert(stdout.join('').includes('typescript@'));
         return 0;
 
     },
