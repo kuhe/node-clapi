@@ -3,7 +3,7 @@
 This is an experiment using `Proxy` in nodejs as well as trying out `typescript`.
 
 This module, known as `clapi` generates node api wrappers around command line programs
-much like `shelljs`, but more generically.
+much like `shelljs`, but is much less useful :D.
 
 ```js
 const clapi = require('clapi');
