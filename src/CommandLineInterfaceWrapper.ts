@@ -1,6 +1,22 @@
 /** structural typedefs */
-declare interface Exec {
-    exec(command: string, callback: Function): void;
+declare interface EventEmitter {
+    on(event: string, fn: Function): void;
+}
+declare interface Writable extends EventEmitter {
+    write(input: string, encoding: string, callback: IoCallback): void;
+}
+declare interface ChildProcess extends EventEmitter {
+    new(): any;
+    stdin: Writable;
+    stdout: EventEmitter;
+    stderr: EventEmitter;
+    disconnect: Function;
+}
+declare interface child_process {
+    ChildProcess: ChildProcess;
+    spawn(cmd: string, argv: string[]): ChildProcess;
+    spawn(cmd: string, argv: string[], options: object): ChildProcess;
+    exec(command: string, callback: Function): ChildProcess;
 }
 declare interface Require {
     (module: string): any;
@@ -19,7 +35,7 @@ declare interface IoCallback {
 }
 /** end structural typedefs */
 
-const child_process: Exec = require('child_process');
+const child_process: child_process = require('child_process');
 
 /**
  *
@@ -74,6 +90,11 @@ export default class CommandLineInterfaceWrapper {
     public ioBuffer: string[] = null;
 
     /**
+     * Node handle.
+     */
+    public process: ChildProcess = null;
+
+    /**
      * @note Copy-construction enabled.
      * @param command can be any CLI command.
      * @param [prefix] to be prepended to the ioBuffer log.
@@ -83,6 +104,10 @@ export default class CommandLineInterfaceWrapper {
 
         if (command instanceof CommandLineInterfaceWrapper) {
             return this.copyConstructor(command);
+        }
+
+        if (!prefix && !command) {
+            prefix = 'SHELL: ';
         }
 
         if (!prefix) {
@@ -139,29 +164,20 @@ export default class CommandLineInterfaceWrapper {
                        resolve: Function,
                        reject: Function): IoCallback {
 
-        const prefix = this.prefix;
-
         return <IoCallback>function (error: string, stdout: string, stderr: string) {
 
-            error = error || '';
-            stderr = stderr || '';
-            stdout = stdout || '';
-
-            const error_: string[] = error.split('\n').filter(Boolean);
-            const stderr_: string[] = stderr.split('\n').filter(Boolean);
-            const stdout_: string[] = stdout.split('\n').filter(Boolean);
-
             if (error) {
-                ioBuffer.push(error_.map(_ => prefix + _).join('\n'));
-                reject(ioBuffer);
+                this.addTo(ioBuffer, error);
             }
             if (stderr) {
-                ioBuffer.push(stderr_.map(_ => prefix + _).join('\n'));
+                this.addTo(ioBuffer, stderr);
+                reject(ioBuffer);
             }
             if (stdout) {
-                ioBuffer.push(stdout_.map(_ => prefix + _).join('\n'));
+                this.addTo(ioBuffer, stdout);
             }
             resolve(ioBuffer);
+
         }
 
     }
@@ -175,9 +191,70 @@ export default class CommandLineInterfaceWrapper {
                             ...argv: string[]): Promise<string[]> {
 
         return new Promise((resolve, reject) => {
-            child_process.exec(argv.join(' '), this.ioCallback(ioBuffer, resolve, reject));
+
+            const hasResolved: boolean = false;
+
+            if (!this.process) {
+
+                const proc = this.process = child_process.spawn(argv[0], argv.slice(1));
+
+                proc.stdout.on('data', (data: string): void => {
+                    this.addTo(ioBuffer, data);
+                    !hasResolved && resolve(ioBuffer);
+                });
+                proc.stderr.on('data', (data: string): void => {
+                    this.addTo(ioBuffer, data);
+                    !hasResolved && reject(ioBuffer);
+                });
+                proc.on('close', (code: number): void => {
+                    this.addTo(ioBuffer, `Child process exited with code ${code}.`);
+                    this.process = null;
+                    !hasResolved && resolve(ioBuffer);
+                });
+
+            } else {
+
+                this.process.stdin.write(argv.join(' '), 'utf-8', this.ioCallback(ioBuffer, resolve, reject));
+
+            }
+
         });
 
+    }
+
+    /**
+     * Concatenation helper.
+     * @param container
+     * @param raw
+     * @returns {string[]}
+     */
+    private addTo(container: string[], raw: string): string[] {
+        const additions = this.format(raw);
+        for (let i: number = 0; i < additions.length; ++i) {
+            container.push(additions[i]);
+        }
+        return container;
+    }
+
+    /**
+     * Clean up output strings representing multiple lines.
+     * @param raw
+     * @returns {string}
+     */
+    private format(raw: string|string[]): string[] {
+        const { prefix = '' } = this;
+
+        if (typeof raw === 'string') {
+            raw = (raw || '')
+                .toString()
+                .split('\n');
+        } else {
+            raw = [...raw];
+        }
+
+        return raw
+            .filter(Boolean)
+            .map(_ => prefix + _);
     }
 
     /**
@@ -195,6 +272,7 @@ export default class CommandLineInterfaceWrapper {
                 };
             },
             set: function (object: object, property: string, value: any): any {
+                // @todo;
                 return true;
             }
         }
@@ -237,6 +315,9 @@ export default class CommandLineInterfaceWrapper {
         this.proxy = other.proxy;
         delete other.proxy;
 
+        this.process = other.process;
+        delete other.process;
+
         return this;
 
     }
@@ -245,6 +326,9 @@ export default class CommandLineInterfaceWrapper {
      * Deletes all properties of this instance.
      */
     public destructor(): void {
+        if (this.process) {
+            this.process.disconnect();
+        }
         new CommandLineInterfaceWrapper('').moveConstructor(this);
     }
 
