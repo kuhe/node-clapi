@@ -50,19 +50,19 @@ const child_process: child_process = require('child_process');
  *
  * @example
  *
- * const CommandLineInterfaceWrapper = require('cli-to-node');
+ * const clapi = require('bam-node-clapi');
  *
- * const echo = new CommandLineInterfaceWrapper('echo');
+ * const echo = new clapi('echo');
  * echo('hello, world').then(...); // Promise
  *
  * @example
  *
- * const du = new CommandLineInterfaceWrapper('du');
+ * const du = new clapi('du');
  *
  * // call directly:
  * du('-sh', './src/*').then(...);
  *
- * // call arbitrary method representing cli arguments:
+ * // call arbitrary method representing first cli argument:
  * du['-sh']('./src/*').then(...);
  *
  */
