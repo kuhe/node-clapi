@@ -1,6 +1,6 @@
 {
   "name": "bam-node-clapi",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "call any cli program from a JS class object",
   "main": "index.js",
   "author": "george.fu@mlb.com",
