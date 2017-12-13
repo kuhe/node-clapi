@@ -1,4 +1,4 @@
-# bam-node-clapi
+# node-clapi
 
 This is an experiment using `Proxy` in nodejs as well as trying out `typescript`.
 
@@ -11,7 +11,7 @@ const clapi = require('clapi');
 ```
 
 For any given command line string such as `eslint lib src controllers` (4 args), you can
-wrap as much of the start of it in `clapi` as you want.
+wrap as much of the beginning of it in `clapi` as you want.
 
 Method calls then dispatch the constructed CLI string and return a promise resolving to the `stdout` of the command.
 

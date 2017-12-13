@@ -1,1 +1,2 @@
-module.exports = require('./src/main').default;
+const clapi = require('./src/main');
+module.exports = clapi.default || clapi;

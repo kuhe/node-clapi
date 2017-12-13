@@ -1,21 +1,21 @@
 {
-  "name": "bam-node-clapi",
-  "version": "0.1.1",
+  "name": "node-clapi",
+  "version": "1.0.0",
   "description": "call any cli program from a JS class object",
   "main": "index.js",
-  "author": "george.fu@mlb.com",
   "license": "ISC",
   "scripts": {
-    "test": "tsc; node test/main.js;"
+    "test": "tsc; node test/main.js;",
+    "scratch": "tsc; node test/scratch.js;"
   },
   "devDependencies": {
-    "typescript": "^2.3.2"
+    "typescript": "^2.6.2"
   },
   "engines": {
-    "node": ">=6.9",
-    "npm": ">=3.0"
+    "node": ">=9.2",
+    "npm": ">=5.5"
   },
   "publishConfig": {
-    "registry": "http://artifactory.us-east-1.bamgrid.net/api/npm/fed-resources"
+    "registry": "https://registry.npmjs.org/"
   }
 }

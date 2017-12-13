@@ -7,7 +7,7 @@ const assert_ = require('assert');
  */
 const results = [];
 const logResults = function () {
-    for (result of results) {
+    for (const result of results) {
         console.log(result);
     }
     results.length = 0;
@@ -30,16 +30,6 @@ assert.equal = function (a, b, msg) {
         results.push(e);
     }
 };
-const logToConsole = function (stdout) {
-    if (stdout instanceof Array) {
-        stdout.forEach(line => {
-            console.log(line);
-        });
-    } else {
-        console.log(stdout);
-    }
-    return stdout;
-};
 
 assert.equal(typeof clapi, 'function', 'clapi should be a constructor');
 
@@ -53,153 +43,51 @@ assert.equal(typeof npm, 'function', 'instantiated clapi are callable');
 
 const greeting = 'Hello, world!';
 
-[Promise.resolve(),
-    () => {
+(async () => {
 
-        const pwd = new clapi('pwd');
-        return pwd();
+    var stdout;
 
-    },
-    logToConsole,
-    stdout => {
+    const pwd = new clapi('pwd');
+    stdout = await pwd();
+    assert.equal(stdout[0].split('/').pop(), 'test', 'pwd is test directory');
 
-        assert.equal(stdout[0].split('/').pop(), 'test', 'pwd is test directory');
-        return 0;
+    const ls = new clapi('ls');
+    stdout = await ls();
+    assert.equal(
+        stdout.filter(_ => _ === path.basename(__filename))[0],
+        path.basename(__filename),
+        'test directory contains this test file'
+    );
 
-    },
-    () => {
-
-        const ls = new clapi('ls');
-        return ls();
-
-    },
-    logToConsole,
-    stdout => {
-
-        assert.equal(
-            stdout.filter(_ => _ === path.basename(__filename))[0],
-            path.basename(__filename),
-            'test directory contains this test file'
-        );
-        return 0;
-
-    },
-    () => {
-
-        return du['-sh']('./../src/*');
-        // return du('-sh', './');
-
-    },
-    logToConsole,
-    stdout => {
-
-        assert(stdout instanceof Array, 'output is an array');
-
-        for (const item of [...stdout]) {
-            assert.equal(typeof item, 'string', 'output item is a string');
-        }
-        return 0;
-
-    },
-    () => {
-
-        return echo(greeting);
-
-    },
-    logToConsole,
-    stdout => {
-
-        assert.equal(stdout[0].trim(), greeting, 'stdout by echo should equal its input');
-        return 0;
-
-    },
-    () => {
-
-        return npm.ls('typescript');
-
-    },
-    logToConsole,
-    stdout => {
-
-        assert(stdout.join('').includes('typescript@'));
-        return 0;
-
-    },
-    () => {
-
-        const git = new clapi('git');
-        return git.status();
-
-    },
-    logToConsole,
-    () => {
-
-        const aws = new clapi('aws');
-        return aws.configure('list');
-
-    },
-    logToConsole,
-    () => {
-
-        const cat = new clapi('cat');
-
-        process.chdir('..');
-
-        return cat['package.json']('| grep version')
-            .then(out => {
-                out[0] = out[0].match(/\d\.\d\.\d/g)[0];
-
-                process.chdir('test');
-
-                return out;
-            });
-
-    },
-    logToConsole,
-    stdout => {
-
-        const actualVersion = require(__dirname + '/../package.json').version;
-        assert.equal(stdout[0], actualVersion, 'shell command finds pkg version');
-        return 0;
-
-    },
-    () => {
-
-        const gpp = new clapi('g++');
-        return gpp['hello.cpp']('-o', 'hello')
-            .then(() => {
-
-                const hello = new clapi('./hello');
-                return hello();
-
-            });
-
-    },
-    logToConsole,
-    stdout => {
-
-        assert.equal(stdout[0], greeting, 'lol');
-        return 0;
-
-    },
-    () => {
-
-        const rm = new clapi('rm');
-        rm.hello();
-
+    stdout = await du['-sh']('./../src/*');
+    assert(stdout instanceof Array, 'output is an array');
+    for (const item of [...stdout]) {
+        assert.equal(typeof item, 'string', 'output item is a string');
     }
 
-].reduce((a, b) => {
+    stdout = await echo(greeting);
+    assert.equal(stdout[0].trim(), greeting, 'stdout by echo should equal its input');
 
-    return a.then(b);
+    stdout = await npm.ls('typescript');
+    assert(stdout.join('').includes('typescript@'), 'typescript is installed');
 
-}).catch(error => {
+    const cat = new clapi('cat');
+    process.chdir('..');
 
-    if (error instanceof Array) {
-        console.error(...error);
-    } else {
-        console.error(error);
-    }
-    return 1;
+    const out = await cat['package.json']('| grep version');
+    out[0] = out[0].match(/\d\.\d\.\d/g)[0];
+    process.chdir('test');
+    const actualVersion = require(__dirname + '/../package.json').version;
+    assert.equal(out[0], actualVersion, 'shell command finds pkg version');
 
-}).then(logResults);
+    const gpp = new clapi('g++');
+    await gpp['hello.cpp']('-o', 'hello');
+    const hello = new clapi('./hello');
+    stdout = await hello();
+    assert.equal(stdout[0], greeting, 'compiled C++ program');
+    const rm = new clapi('rm');
+    await rm.hello();
+
+    return logResults();
+
+})();
