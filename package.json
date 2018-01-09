@@ -1,6 +1,6 @@
 {
   "name": "node-clapi",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "call any cli program from a JS class object",
   "main": "index.js",
   "license": "ISC",
