@@ -183,12 +183,14 @@ export default class clapi {
             }
             if (stderr) {
                 this.addTo(ioBuffer, stderr);
-                reject(ioBuffer);
+                reject(ioBuffer.slice());
             }
             if (stdout) {
                 this.addTo(ioBuffer, stdout);
             }
-            resolve(ioBuffer.slice());
+            if (!stderr) {
+                resolve(ioBuffer.slice());
+            }
             this.flush();
 
         }
